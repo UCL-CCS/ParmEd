@@ -50,8 +50,9 @@ def create_dataframe(obj):
         - rmin_14 : float
         - epsilon_14 : float
         - resname : str (name of the containing residue)
-        - resid : int (Sequential index of the containing residue)
+        - resid : int (sequential index of the containing residue)
         - resnum : int (original residue number in the input structure)
+        - insertion: str (character code indentifying sequence insertions)
         - chain : str (chain ID that the containing residue belongs to)
 
     The following attributes are optionally present if they were present in
@@ -113,6 +114,7 @@ def create_dataframe(obj):
     ret['resname'] = [atom.residue.name for atom in atoms]
     ret['resid'] = [atom.residue.idx for atom in atoms]
     ret['resnum'] = [atom.residue.number for atom in atoms]
+    ret['insertion'] = [atom.residue.insertion_code for atom in atoms]
     ret['chain'] = [atom.residue.chain for atom in atoms]
     ret['segid'] = [atom.residue.segid for atom in atoms]
 
