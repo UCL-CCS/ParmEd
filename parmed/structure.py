@@ -307,6 +307,7 @@ class Structure(object):
         self.title = ''
         self._combining_rule = 'lorentz'
         self.symmetry = None
+        self.biological_units = None
 
     #===================================================
 

@@ -8,6 +8,7 @@ from contextlib import closing
 import io
 import ftplib
 import numpy as np
+from collections import OrderedDict
 from parmed.exceptions import PDBError, PDBWarning
 from parmed.formats.pdbx import PdbxReader, PdbxWriter, containers
 from parmed.formats.registry import FileFormatType
@@ -16,7 +17,7 @@ from parmed.residue import AminoAcidResidue, RNAResidue, DNAResidue, WATER_NAMES
 from parmed.modeller import StandardBiomolecularResidues
 from parmed.structure import Structure
 from parmed.topologyobjects import Atom, ExtraPoint, Bond
-from parmed.symmetry import Symmetry
+from parmed.symmetry import Symmetry, BioTransform, BioUnit
 from parmed.utils.io import genopen
 from parmed.utils.six import iteritems, string_types, add_metaclass, PY3
 from parmed.utils.six.moves import range
@@ -92,6 +93,83 @@ def _number_truncated_to_n_digits(num, digits):
     if num < 0:
         return int(-(-num % eval('1e%d' % (digits-1))))
     return int(num % eval('1e%d' % digits))
+
+def _parse_biomt(biomt_lines):
+    """ Parse BIOMT lines and return an ordered dictionary of `BioUnits`
+
+    Parameters
+    ----------
+    biomt_line : list
+        Lines containing REMARK 350 lines from a PDB
+
+    Returns
+    -------
+    structure : :class:`Structure`
+        The Structure object initialized with all of the information from
+        the PDB file.  No bonds or other topological features are added by
+        default.
+    """
+    biological_units = OrderedDict()
+
+    biomol_no = None
+
+    for line in biomt_lines:
+
+        if 'BIOMOLECULE' in line:
+            # Start of a new biological unit
+            # Record any previous & reset variables to be read
+            # Example of line format:
+            # REMARK 350 BIOMOLECULE: 1
+
+            if biomol_no is not None:
+
+                biological_units[biomol_no] = BioUnit(chains=chains, source=origin,
+                                                      nmer=nmer, transforms=matrices)
+
+            matrices = []
+            current_matrix = []
+            nmer = ''
+            chains=[]
+
+            biomol_no = int(line.split()[3])
+
+        elif 'DETERMINED' in line:
+            # Is this an author or software determined unit?
+            # What order of multimer is indicated?
+            # Example of line format:
+            # REMARK 350 SOFTWARE DETERMINED QUATERNARY STRUCTURE: DIMERIC
+            nmer = line.split(':')[1]
+            origin = line.split()[2]
+
+        elif 'APPLY THE FOLLOWING' in line:
+            # Which chains does this apply to?
+            # Example of line format:
+            # REMARK 350 APPLY THE FOLLOWING TO CHAINS: A,B
+
+            chain_txt = line.split(':')[1]
+            chains = [x.strip() for x in chain_txt.split(',')]
+
+        elif '350   BIOMT' in line:
+            # Parse the transformation matrices, provided for each
+            # additional copy of the system elements to be created
+            # Matrix is aplit across three lines (BIOMT1, BIOMT2, BIOMT3)
+            # Example of line format:
+            # REMARK 350   BIOMT1   1  1.000000  0.000000  0.000000        0.00000
+
+            columns = line.split()
+            row_label = columns[2][-1]
+            current_matrix.append(columns[4:8])
+
+            # BioUnit requires a 3*4 matrix containing translation and
+            # rotation information
+            if row_label == '3':
+                matrices.append(BioTransform(current_matrix))
+                current_matrix = []
+
+    biological_units[biomol_no] = BioUnit(chains=chains, source=origin,
+                                          nmer=nmer, transforms=matrices)
+
+    return biological_units
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -342,7 +420,7 @@ class PDBFile(object):
             for line in fileobj:
                 if 'REMARK 290   SMTRY' in line:
                     _symmetry_lines.append(line)
-                if any(x in line for x in ['REMARK 300', 'REMARK 350']):
+                if 'REMARK 350' in line:
                     _biomt_lines.append(line)
                 rec = line[:6]
                 if rec == 'ATOM  ' or rec == 'HETATM':
@@ -691,7 +769,7 @@ class PDBFile(object):
             struct.symmetry = Symmetry(tensor)
 
         if _biomt_lines:
-            pass
+            struct.biological_units = _parse_biomt(_biomt_lines)
 
         return struct
 
