@@ -336,11 +336,14 @@ class PDBFile(object):
         ZEROSET = set('0')
         altloc_ids = set()
         _symmetry_lines = []
+        _biomt_lines = []
 
         try:
             for line in fileobj:
                 if 'REMARK 290   SMTRY' in line:
                     _symmetry_lines.append(line)
+                if any(x in line for x in ['REMARK 300', 'REMARK 350']):
+                    _biomt_lines.append(line)
                 rec = line[:6]
                 if rec == 'ATOM  ' or rec == 'HETATM':
                     atomno += 1
@@ -686,6 +689,10 @@ class PDBFile(object):
                     data.append(line.split()[4:])
             tensor = np.asarray(data, dtype='f8')
             struct.symmetry = Symmetry(tensor)
+
+        if _biomt_lines:
+            pass
+
         return struct
 
     #===================================================
