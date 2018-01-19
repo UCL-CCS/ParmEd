@@ -85,6 +85,7 @@ def create_dataframe(obj):
         - U13 : float (U[1][3] of anisotropic b-factor tensor)
         - U23 : float (U[2][3] of anisotropic b-factor tensor)
     """
+
     if pd is None:
         raise ImportError('pandas is not available; cannot create a pandas '
                           'DataFrame from this Structure')
@@ -129,6 +130,7 @@ def create_dataframe(obj):
         pass
     else:
         ret = ret.join(coords)
+
     # Velocities
     try:
         vels = pd.DataFrame(
@@ -139,16 +141,19 @@ def create_dataframe(obj):
         pass
     else:
         ret = ret.join(vels)
+
     # AMOEBA LJ type
     try:
         ret['type_idx'] = [atom.type_idx for atom in atoms]
     except AttributeError:
         pass
+
     # AMOEBA class type
     try:
         ret['class_idx'] = [atom.class_idx for atom in atoms]
     except AttributeError:
         pass
+
     # AMOEBA multipoles
     try:
         multipoles = pd.DataFrame(
@@ -158,37 +163,46 @@ def create_dataframe(obj):
                          'multipole_422', 'multipole_413', 'multipole_423',
                          'multipole_433']
         )
+
     except AttributeError:
         pass
     else:
         ret = ret.join(multipoles)
+
     # AMOEBA polarizabilities
     try:
         ret['polarizability'] = [atom.polarizability for atom in atoms]
     except AttributeError:
         pass
+
     # AMOEBA vdw parent atom
     try:
         ret['vdw_parent'] = [atom.vdw_parent.idx for atom in atoms]
     except AttributeError:
         pass
+
     # anisotropic b-factors
     none6 = [None] * 6
     anisos = [atom.anisou for atom in atoms]
+
     for i, aniso in enumerate(anisos):
         if hasattr(aniso, 'tolist'):
             anisos[i] = aniso.tolist()
+
     all_nones = True
+
     for i, aniso in enumerate(anisos):
         if aniso is None:
             anisos[i] = none6
         elif all_nones:
             all_nones = False
+
     if not all_nones:
         ret = ret.join(
                 pd.DataFrame(anisos,
                     columns=['U11', 'U22', 'U33', 'U12', 'U13', 'U23'])
         )
+
     return ret
 
 def load_dataframe(obj, dataframe):
